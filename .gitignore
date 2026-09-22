@@ -1,0 +1,16 @@
+# Node / Expo
+mobile/node_modules/
+mobile/.expo/
+mobile/dist/
+mobile/.env
+mobile/google-services.json
+
+# Java / Maven
+backend/target/
+*.class
+
+# IDE / OS
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db

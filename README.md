@@ -67,34 +67,134 @@ npm install
 cp .env.example .env
 ```
 
+No Windows, o arquivo `.env.example` também pode ser copiado manualmente para `.env`.
+
 Edite `.env` e informe o endereço do computador na rede local:
 
 ```env
 EXPO_PUBLIC_API_URL=http://192.168.0.10:8080
 ```
 
-Depois:
+O celular e o computador precisam conseguir se comunicar pela rede.
+
+## 3. Configurar Expo / EAS
+
+Dentro de `mobile/`:
 
 ```bash
+npx eas-cli@latest login
 npx eas-cli@latest init
 npx eas-cli@latest build:configure
 ```
 
-Configure o Firebase/FCM, adicione o `google-services.json` em `mobile/` e gere o development build:
+O `eas init` associa o projeto ao Expo/EAS e adiciona o `projectId` usado para obter o `ExpoPushToken`.
+
+## 4. Configurar Firebase / FCM
+
+No Firebase Console:
+
+1. Crie ou escolha um projeto.
+2. Adicione um aplicativo **Android**.
+3. Use exatamente o package:
+
+```text
+com.exemplo.pushnotification
+```
+
+4. Baixe o arquivo `google-services.json`.
+5. Coloque-o localmente em:
+
+```text
+mobile/google-services.json
+```
+
+O arquivo está no `.gitignore` e **não será enviado ao EAS Build pelo Git**.
+
+### 4.1 Enviar google-services.json ao EAS
+
+O EAS Build precisa receber o arquivo separadamente. Dentro de `mobile/`, execute:
+
+```bash
+npx eas-cli@latest env:set --name GOOGLE_SERVICES_JSON --value ./google-services.json --environment development --type file --visibility secret
+```
+
+Confira:
+
+```bash
+npx eas-cli@latest env:list --environment development
+```
+
+Deve existir uma variável chamada:
+
+```text
+GOOGLE_SERVICES_JSON
+```
+
+O projeto possui `app.config.js`, que usa:
+
+```javascript
+process.env.GOOGLE_SERVICES_JSON ?? './google-services.json'
+```
+
+Assim:
+
+```text
+Execução local
+→ usa ./google-services.json
+
+EAS Build
+→ usa o arquivo enviado como GOOGLE_SERVICES_JSON
+```
+
+> Não remova o `google-services.json` do `.gitignore` apenas para fazer o build funcionar.
+
+## 5. Configurar credencial FCM V1
+
+O `google-services.json` identifica o aplicativo Android no Firebase, mas não é a credencial privada usada para envio via FCM V1.
+
+No Firebase Console:
+
+```text
+Project settings
+→ Service accounts
+→ Generate new private key
+```
+
+Baixe o JSON da Service Account e mantenha-o privado.
+
+Depois:
+
+```bash
+npx eas-cli@latest credentials
+```
+
+No menu Android, configure a **Google Service Account Key for Push Notifications (FCM V1)** usando esse JSON.
+
+> O JSON da Service Account contém chave privada. Nunca faça commit dele no GitHub.
+
+## 6. Gerar o development build
+
+O profile `development` do `eas.json` usa explicitamente o ambiente EAS `development`, portanto receberá a variável `GOOGLE_SERVICES_JSON`.
+
+Execute:
 
 ```bash
 npx eas-cli@latest build --profile development --platform android
 ```
 
-Após instalar o build no Android:
+O resultado será um **APK de development build** para instalação direta no Android.
+
+Após instalar o APK:
 
 ```bash
 npx expo start
 ```
 
-## Fluxo de teste
+Abra no Android o aplicativo **Push Notification** instalado, e não o Expo Go.
 
-1. Abrir o aplicativo.
+## 7. Fluxo de teste
+
+1. Abrir o development build.
 2. Solicitar permissão.
 3. Testar uma notificação local.
 4. Gerar o Expo Push Token.
@@ -111,11 +211,36 @@ Não faça commit de:
 
 - `.env`
 - `google-services.json`
+- JSON da Service Account
 - chaves privadas
-- credenciais de Service Account
+- outras credenciais
+
+## Se o EAS informar que google-services.json está ausente
+
+Erro típico:
+
+```text
+"google-services.json" is missing
+Remember that EAS Build only uploads the files tracked by git.
+```
+
+Verifique:
+
+```bash
+npx eas-cli@latest env:list --environment development
+```
+
+A variável `GOOGLE_SERVICES_JSON` precisa existir como variável do tipo **file** no ambiente `development`.
+
+Depois execute novamente:
+
+```bash
+npx eas-cli@latest build --profile development --platform android
+```
 
 ## Documentação
 
 - https://docs.expo.dev/push-notifications/overview/
 - https://docs.expo.dev/push-notifications/push-notifications-setup/
-- https://docs.expo.dev/push-notifications/sending-notifications/
+- https://docs.expo.dev/push-notifications/fcm-credentials/
+- https://docs.expo.dev/eas/environment-variables/manage/
